@@ -1,0 +1,6 @@
+competition,season,date,home_team,away_team,home_goals,away_goals,home_xg,away_xg,result
+Premier League,2024-2025,2024-08-10,A,B,2.0,0.0,1.4,0.7,H
+Premier League,2024-2025,2024-08-11,C,A,1.0,1.0,0.9,1.1,D
+Premier League,2024-2025,2024-08-18,B,C,0.0,1.0,0.8,1.2,A
+Premier League,2024-2025,2024-08-25,A,C,3.0,2.0,2.0,1.5,H
+Premier League,2024-2025,2024-09-01,B,A,,,,,

@@ -52,7 +52,6 @@ def build_pipeline(feature_cols: list[str], categorical_cols: list[str]) -> Pipe
 
     clf = LogisticRegression(
         max_iter=2000,
-        multi_class="multinomial",
         n_jobs=1,
         C=1.0,
     )

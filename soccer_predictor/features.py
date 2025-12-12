@@ -18,11 +18,24 @@ def add_rolling_team_features(
     df = matches.copy()
     df = df.sort_values(["date", "competition", "season"], kind="stable").reset_index(drop=True)
 
+    # Identify stat pairs present as home_<stat> / away_<stat>
+    ignore_bases = {
+        "team",
+        "goals",  # we use goals via home_goals/away_goals below
+    }
+    stat_bases: list[str] = []
+    for c in df.columns:
+        if not c.startswith("home_"):
+            continue
+        base = c[len("home_") :]
+        if base in ignore_bases:
+            continue
+        if f"away_{base}" in df.columns:
+            stat_bases.append(base)
+
     # Build a long-form table of team-match rows
     base_cols = ["competition", "season", "date", "home_team", "away_team", "home_goals", "away_goals"]
-    optional = [c for c in ["home_xg", "away_xg"] if c in df.columns]
-    use_cols = base_cols + optional
-    df2 = df[use_cols].copy()
+    df2 = df[base_cols + [f"home_{b}" for b in stat_bases] + [f"away_{b}" for b in stat_bases]].copy()
 
     home_rows = pd.DataFrame(
         {
@@ -33,8 +46,6 @@ def add_rolling_team_features(
             "is_home": 1,
             "gf": df2["home_goals"],
             "ga": df2["away_goals"],
-            "xg": df2["home_xg"] if "home_xg" in df2.columns else np.nan,
-            "xga": df2["away_xg"] if "away_xg" in df2.columns else np.nan,
         }
     )
     away_rows = pd.DataFrame(
@@ -46,10 +57,15 @@ def add_rolling_team_features(
             "is_home": 0,
             "gf": df2["away_goals"],
             "ga": df2["home_goals"],
-            "xg": df2["away_xg"] if "away_xg" in df2.columns else np.nan,
-            "xga": df2["home_xg"] if "home_xg" in df2.columns else np.nan,
         }
     )
+
+    # Add generic stat_for/stat_against from detected pairs
+    for b in stat_bases:
+        home_rows[f"{b}_for"] = df2[f"home_{b}"]
+        home_rows[f"{b}_against"] = df2[f"away_{b}"]
+        away_rows[f"{b}_for"] = df2[f"away_{b}"]
+        away_rows[f"{b}_against"] = df2[f"home_{b}"]
 
     long = pd.concat([home_rows, away_rows], ignore_index=True)
     long = long.sort_values(["competition", "season", "team", "date"], kind="stable")
@@ -61,11 +77,13 @@ def add_rolling_team_features(
 
     # Prior-match rolling stats (shift by 1 to avoid leakage)
     for w in windows:
-        for col in ["gf", "ga", "pts", "xg", "xga"]:
-            if col in long.columns:
-                long[f"{col}_r{w}"] = grp[col].transform(
-                    lambda s: s.shift(1).rolling(w, min_periods=1).mean()
-                )
+        for col in [c for c in long.columns if c not in {"competition", "season", "date", "team", "is_home"}]:
+            if col in {"matches_played"}:
+                continue
+            # Only roll numeric-like columns
+            if long[col].dtype.kind not in {"i", "u", "f"}:
+                continue
+            long[f"{col}_r{w}"] = grp[col].transform(lambda s: s.shift(1).rolling(w, min_periods=1).mean())
 
     # Also include simple match counts
     long["matches_played"] = grp.cumcount()

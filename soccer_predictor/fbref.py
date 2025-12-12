@@ -12,6 +12,16 @@ from .utils import HttpCache
 
 FBREF_BASE = "https://fbref.com"
 
+@dataclass(frozen=True)
+class Competition:
+    name: str
+    comp_id: int
+
+    def season_page(self, season: str) -> str:
+        # season examples: "2024-2025" (leagues) or "2024-2025" (UEFA comps)
+        return f"{FBREF_BASE}/en/comps/{self.comp_id}/{season}"
+
+
 DEFAULT_COMPETITIONS: list[Competition] = [
     Competition(name="Premier League", comp_id=9),
     Competition(name="La Liga", comp_id=12),
@@ -23,16 +33,6 @@ DEFAULT_COMPETITIONS: list[Competition] = [
     # Best-effort; if FBref changes this ID, pass --comp-ids explicitly.
     Competition(name="Europa Conference League", comp_id=882),
 ]
-
-
-@dataclass(frozen=True)
-class Competition:
-    name: str
-    comp_id: int
-
-    def season_page(self, season: str) -> str:
-        # season examples: "2024-2025" (leagues) or "2024-2025" (UEFA comps)
-        return f"{FBREF_BASE}/en/comps/{self.comp_id}/{season}"
 
 
 def _soup_with_uncommented_tables(html: str) -> BeautifulSoup:

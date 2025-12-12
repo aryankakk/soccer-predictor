@@ -17,6 +17,7 @@ from .fbref import (
 )
 from .features import add_rolling_team_features
 from .model import TrainedModel, load_model, predict_proba, save_model, train_multiclass
+from .stats import enrich_fixtures_with_fbref_teamlogs
 from .utils import HttpCache, ensure_dir
 
 
@@ -35,6 +36,7 @@ def cmd_fetch(args: argparse.Namespace) -> int:
         raise SystemExit("Could not resolve competitions from FBref.")
 
     out_rows = []
+    out_rows_enriched = []
     for comp in comps:
         seasons = list_seasons(cache, comp, max_seasons=args.max_seasons)
         for season in seasons:
@@ -44,6 +46,15 @@ def cmd_fetch(args: argparse.Namespace) -> int:
             raw = fetch_scores_and_fixtures(cache, url)
             norm = normalize_schedule_df(raw, competition=comp.name, season=season)
             out_rows.append(norm)
+            if args.with_stats:
+                enriched = enrich_fixtures_with_fbref_teamlogs(
+                    cache,
+                    fixtures=norm,
+                    comp=comp,
+                    season=season,
+                    max_teams=args.max_teams,
+                )
+                out_rows_enriched.append(enriched)
 
     if not out_rows:
         raise SystemExit("No schedule data fetched.")
@@ -52,6 +63,15 @@ def cmd_fetch(args: argparse.Namespace) -> int:
     ensure_dir(Path(args.out_csv).parent)
     df.to_csv(args.out_csv, index=False)
     print(f"Wrote {len(df):,} rows to {args.out_csv}")
+
+    if args.with_stats:
+        if not out_rows_enriched:
+            print("Warning: --with-stats requested but no enriched rows were produced.")
+        else:
+            df_enriched = pd.concat(out_rows_enriched, ignore_index=True)
+            ensure_dir(Path(args.out_enriched_csv).parent)
+            df_enriched.to_csv(args.out_enriched_csv, index=False)
+            print(f"Wrote {len(df_enriched):,} rows to {args.out_enriched_csv}")
     return 0
 
 
@@ -150,6 +170,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     f = sub.add_parser("fetch", help="Fetch schedules from FBref")
     f.add_argument("--out-csv", default="data/matches_raw.csv")
+    f.add_argument("--out-enriched-csv", default="data/matches_enriched.csv")
     f.add_argument("--cache-dir", default="data/cache")
     f.add_argument("--max-seasons", type=int, default=6)
     f.add_argument("--min-delay-s", type=float, default=3.0)
@@ -164,6 +185,17 @@ def build_parser() -> argparse.ArgumentParser:
         "--use-playwright",
         action="store_true",
         help="Use a headless browser for fetching (helps with Cloudflare/403).",
+    )
+    f.add_argument(
+        "--with-stats",
+        action="store_true",
+        help="Also scrape team matchlogs (shots/possession/passing/etc where available) and merge into fixtures.",
+    )
+    f.add_argument(
+        "--max-teams",
+        type=int,
+        default=None,
+        help="Limit teams scraped per comp/season (useful for testing).",
     )
     f.set_defaults(func=cmd_fetch)
 

@@ -20,6 +20,11 @@ Fetch (cached + rate-limited):
 python3 scripts/run_soccer_predictor.py fetch --max-seasons 6
 ```
 
+Fetch + **in-depth stats** (team match logs like shots/SOT/possession/passing/etc where available):
+```bash
+python3 scripts/run_soccer_predictor.py fetch --with-stats --max-seasons 6 --out-enriched-csv data/matches_enriched.csv
+```
+
 If FBref returns **403 (Cloudflare challenge)** in your environment, use the browser fetcher:
 ```bash
 pip install -r requirements-browser.txt
